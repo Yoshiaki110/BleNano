@@ -7,26 +7,26 @@ BLE           ble;
 static uint8_t service1_uuid[]    = {0x71, 0x3D, 0, 0, 0x50, 0x3E, 0x4C, 0x75, 0xBA, 0x94, 0x31, 0x48, 0xF1, 0x8D, 0x94, 0x1E};
 UUID service_uuid(service1_uuid);
 
-static uint8_t device_is_simple_peripheral = 0;
+//static uint8_t device_is_simple_peripheral = 0;
 
 // When found the match characteristic, set 1.
-static uint8_t characteristic_is_fond = 0;
+//static uint8_t characteristic_is_fond = 0;
 // When found the match descriptor, set 1.
-static uint8_t descriptor_is_found = 0;
+//static uint8_t descriptor_is_found = 0;
 // To save the hrm characteristic and descriptor
 static DiscoveredCharacteristic            Characteristic_values;
-static DiscoveredCharacteristicDescriptor  desc_of_Characteristic_values(NULL,GattAttribute::INVALID_HANDLE,GattAttribute::INVALID_HANDLE,UUID::ShortUUIDBytes_t(0));
+//static DiscoveredCharacteristicDescriptor  desc_of_Characteristic_values(NULL,GattAttribute::INVALID_HANDLE,GattAttribute::INVALID_HANDLE,UUID::ShortUUIDBytes_t(0));
 
 //関数
 static void scanCallBack(const Gap::AdvertisementCallbackParams_t *params);
 static void discoveredCharacteristicCallBack(const DiscoveredCharacteristic *chars);
-static void discoveryTerminationCallBack(Gap::Handle_t connectionHandle);
-static void discoveredCharsDescriptorCallBack(const CharacteristicDescriptorDiscovery::DiscoveryCallbackParams_t *params);
-static void discoveredDescTerminationCallBack(const CharacteristicDescriptorDiscovery::TerminationCallbackParams_t *params) ;
+//static void discoveryTerminationCallBack(Gap::Handle_t connectionHandle);
+//static void discoveredCharsDescriptorCallBack(const CharacteristicDescriptorDiscovery::DiscoveryCallbackParams_t *params);
+//sta//tic void discoveredDescTerminationCallBack(const CharacteristicDescriptorDiscovery::TerminationCallbackParams_t *params) ;
 
 static void onDataWriteCallBack(const GattWriteCallbackParams *params); //送信のときに呼ぶ
 static void onDataReadCallBack(const GattReadCallbackParams *params); //静的なデータを取得するときに呼ぶ
-void hvxCallBack(const GattHVXCallbackParams *params); //動的なデータを取得するときに呼ぶ
+//void hvxCallBack(const GattHVXCallbackParams *params); //動的なデータを取得するときに呼ぶ
 
 
 /**
@@ -65,7 +65,7 @@ static void scanCallBack(const Gap::AdvertisementCallbackParams_t *params) {
     if( memcmp("TXRX", adv_name, 4) == 0x00 ) {//取得したいショートネームを書く
       Serial.println("Got device, stop scan ");
       ble.stopScan();
-      device_is_simple_peripheral = 1;
+//      device_is_simple_peripheral = 1;
       ble.connect(params->peerAddr, BLEProtocol::AddressType::RANDOM_STATIC, NULL, NULL);
     }
   }
@@ -89,9 +89,9 @@ void connectionCallBack( const Gap::ConnectionCallbackParams_t *params ) {
  */
 void disconnectionCallBack(const Gap::DisconnectionCallbackParams_t *params) {
   Serial.println("Disconnected, start to scanning");
-  device_is_simple_peripheral = 0;
-  characteristic_is_fond = 0;
-  descriptor_is_found = 0;
+//  device_is_simple_peripheral = 0;
+//  characteristic_is_fond = 0;
+//  descriptor_is_found = 0;
   ble.startScan(scanCallBack);
 }
 
@@ -136,7 +136,7 @@ static void discoveredCharacteristicCallBack(const DiscoveredCharacteristic *cha
   //notifyが許可されているか
   if(chars->getProperties().notify() == 0x01){
     Serial.println("found notify");
-    characteristic_is_fond = 1;
+ //   characteristic_is_fond = 1;
     Characteristic_values = *chars;
   }
   if (chars->getValueHandle() == 0x0E){
@@ -152,18 +152,18 @@ static void discoveredCharacteristicCallBack(const DiscoveredCharacteristic *cha
 /**
  * 通知の準備
  */
-static void discoveryTerminationCallBack(Gap::Handle_t connectionHandle) {
+/*static void discoveryTerminationCallBack(Gap::Handle_t connectionHandle) {
   Serial.println("\r\n----discoveryTermination");
   Serial.print("connectionHandle       : ");
   Serial.println(connectionHandle, HEX);
   if(characteristic_is_fond == 1) {
     ble.gattClient().discoverCharacteristicDescriptors(Characteristic_values, discoveredCharsDescriptorCallBack, discoveredDescTerminationCallBack);
   }
-}
+}*/
 
 /** 
  *  0x2902(通知のUUID)があるか
- */
+ *//*
 static void discoveredCharsDescriptorCallBack(const CharacteristicDescriptorDiscovery::DiscoveryCallbackParams_t *params) {
   Serial.println("\r\n----discovered descriptor");
   Serial.print("Desriptor UUID : ");
@@ -173,18 +173,18 @@ static void discoveredCharsDescriptorCallBack(const CharacteristicDescriptorDisc
     descriptor_is_found = 1;
     desc_of_Characteristic_values = params->descriptor;
   }
-}
+}*/
 
 /** 
  * クライアントに送信して、notifyの準備をしてもらう
  */
-static void discoveredDescTerminationCallBack(const CharacteristicDescriptorDiscovery::TerminationCallbackParams_t *params) {
+/*static void discoveredDescTerminationCallBack(const CharacteristicDescriptorDiscovery::TerminationCallbackParams_t *params) {
   Serial.println("\r\n----discovery descriptor Termination");
   if(descriptor_is_found) {
     uint16_t value = 0x0001;
     ble.gattClient().write(GattClient::GATT_OP_WRITE_REQ, Characteristic_values.getConnectionHandle(), desc_of_Characteristic_values.getAttributeHandle(), 2, (uint8_t *)&value);
   }
-}
+}*/
 
 /**
  * データをPeripheralへ送信
@@ -224,7 +224,7 @@ void onDataReadCallBack(const GattReadCallbackParams *params) {
  * notifyの読み込み
  * Peripheralから動的なデータを取得するときに使う
  */
-void hvxCallBack(const GattHVXCallbackParams *params) {
+/*void hvxCallBack(const GattHVXCallbackParams *params) {
   Serial.println("GattClient notify call back ");
   Serial.print("The len : ");
   Serial.println(params->len, DEC);
@@ -234,7 +234,7 @@ void hvxCallBack(const GattHVXCallbackParams *params) {
     Serial.print(" ");
   }
   Serial.println("");
-}
+}*/
 
 void setup() {
   // put your setup code here, to run once:
