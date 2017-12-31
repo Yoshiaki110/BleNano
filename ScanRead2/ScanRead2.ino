@@ -1,7 +1,7 @@
 #include <nRF5x_BLE_API.h>
 
 BLE           ble;
-
+static uint8_t CHECK_POINT_ID = 0x11;
 //ServerのUUID
 static uint8_t service1_uuid[]    = {0x71, 0x3D, 0, 0, 0x50, 0x3E, 0x4C, 0x75, 0xBA, 0x94, 0x31, 0x48, 0xF1, 0x8D, 0x94, 0x1E};
 UUID service_uuid(service1_uuid);
@@ -116,11 +116,11 @@ static void discoveredCharacteristicCallBack(const DiscoveredCharacteristic *cha
   Serial.println(chars->getConnectionHandle(), HEX);
   Serial.println("");
 
-  //notifyが許可されているか
+/*  //notifyが許可されているか
   if(chars->getProperties().notify() == 0x01){
     Serial.println("found notify");
     Characteristic_values = *chars;
-  }
+  }*/
   if (chars->getValueHandle() == 0x0E){
     Characteristic_values = *chars;
     ble.gattClient().read(chars->getConnectionHandle(), chars->getValueHandle(), 0);
@@ -150,14 +150,18 @@ void onDataReadCallBack(const GattReadCallbackParams *params) {
   Serial.print("The len : ");
   Serial.println(params->len, DEC);
   Serial.print("The data : ");
-  for(uint8_t index=0; index<params->len; index++) {
-    Serial.print( params->data[index]); //これでデータを取得する
+  for (uint8_t index=0; index<params->len; index++) {
+    Serial.print(params->data[index]); //これでデータを取得する
     Serial.print(" ");
-    }
+  }
   Serial.println("");
-  Serial.println("--- write!!! ---");
-  uint16_t value = 0x0306;
-  ble.gattClient().write(GattClient::GATT_OP_WRITE_REQ, Characteristic_values.getConnectionHandle(), params->handle, 2, (uint8_t *)&value);
+
+  if (params->data[0] ==0) {
+    uint8_t value = CHECK_POINT_ID;
+    ble.gattClient().write(GattClient::GATT_OP_WRITE_REQ, Characteristic_values.getConnectionHandle(), params->handle, 1, (uint8_t *)&value);
+  } else {
+    ble.disconnect((Gap::DisconnectionReason_t)0);
+  }
 }
 
 void setup() {
