@@ -1,6 +1,6 @@
 #include <nRF5x_BLE_API.h>
 
-//#define DEBUG
+#define DEBUG
 
 #ifdef DEBUG
 #define sprintln Serial.println
@@ -77,6 +77,7 @@ void connectionCallBack( const Gap::ConnectionCallbackParams_t *params ) {
   sprintln("\r\n----startDiscovery");
   //オプションつけると自作したサービスのみが呼ばれるようになる
   ble.gattClient().launchServiceDiscovery(params->handle, NULL, discoveredCharacteristicCallBack, service_uuid);
+  digitalWrite(13, LOW);
 }
 
 
@@ -86,6 +87,7 @@ void connectionCallBack( const Gap::ConnectionCallbackParams_t *params ) {
 void disconnectionCallBack(const Gap::DisconnectionCallbackParams_t *params) {
   sprintln("Disconnected, start to scanning");
   ble.startScan(scanCallBack);
+  digitalWrite(13, HIGH);
 }
 
 /**
@@ -175,6 +177,7 @@ void onDataReadCallBack(const GattReadCallbackParams *params) {
 }
 
 void setup() {
+  pinMode(13, OUTPUT);
   // put your setup code here, to run once:
   Serial.begin(9600);
   sprintln("BLE Central Demo ");
@@ -188,6 +191,7 @@ void setup() {
   ble.setScanParams(1000, 200, 0, true); //スキャニング時間 ウィンドウ時間? タイムアウト アクティブにするか
   // start scanning
   ble.startScan(scanCallBack); //スキャニングのスタート
+  digitalWrite(13, HIGH);
 }
 
 void loop() {
