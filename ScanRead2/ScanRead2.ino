@@ -1,5 +1,15 @@
 #include <nRF5x_BLE_API.h>
 
+//#define DEBUG
+
+#ifdef DEBUG
+#define sprintln Serial.println
+#define sprint Serial.print
+#else
+#define sprintln(fmt, ...) ;
+#define sprint(fmt, ...) ;
+#endif
+
 BLE           ble;
 static uint8_t CHECK_POINT_ID = 0x11;
 //ServerのUUID
@@ -46,13 +56,13 @@ static void scanCallBack(const Gap::AdvertisementCallbackParams_t *params) {
   uint8_t len;
   uint8_t adv_name[31];
   if( NRF_SUCCESS == ble_advdata_parser(BLE_GAP_AD_TYPE_SHORT_LOCAL_NAME, params->advertisingDataLen, (uint8_t *)params->advertisingData, &len, adv_name) ) {
-    Serial.print("Short name len : ");
-    Serial.println(len, DEC);
-    Serial.print("Short name is : ");
-    Serial.println((const char*)adv_name);
+    sprint("Short name len : ");
+    sprintln(len, DEC);
+    sprint("Short name is : ");
+    sprintln((const char*)adv_name);
 
     if( memcmp("TXRX", adv_name, 4) == 0x00 ) {//取得したいショートネームを書く
-      Serial.println("Got device, stop scan ");
+      sprintln("Got device, stop scan ");
       ble.stopScan();
       ble.connect(params->peerAddr, BLEProtocol::AddressType::RANDOM_STATIC, NULL, NULL);
     }
@@ -64,7 +74,7 @@ static void scanCallBack(const Gap::AdvertisementCallbackParams_t *params) {
  * discoveredCharacteristicCallBack関数で表示をする
  */
 void connectionCallBack( const Gap::ConnectionCallbackParams_t *params ) {
-  Serial.println("\r\n----startDiscovery");
+  sprintln("\r\n----startDiscovery");
   //オプションつけると自作したサービスのみが呼ばれるようになる
   ble.gattClient().launchServiceDiscovery(params->handle, NULL, discoveredCharacteristicCallBack, service_uuid);
 }
@@ -74,7 +84,7 @@ void connectionCallBack( const Gap::ConnectionCallbackParams_t *params ) {
  * 切断のときに呼ばれる
  */
 void disconnectionCallBack(const Gap::DisconnectionCallbackParams_t *params) {
-  Serial.println("Disconnected, start to scanning");
+  sprintln("Disconnected, start to scanning");
   ble.startScan(scanCallBack);
 }
 
@@ -83,38 +93,38 @@ void disconnectionCallBack(const Gap::DisconnectionCallbackParams_t *params) {
  */
 static void discoveredCharacteristicCallBack(const DiscoveredCharacteristic *chars) {
   //Info
-  Serial.print("Chars UUID type:");
-  Serial.println(chars->getUUID().shortOrLong(), HEX);// 0 16bit_uuid, 1 128bit_uuid
-  Serial.print("Chars UUID: ");
+  sprint("Chars UUID type:");
+  sprintln(chars->getUUID().shortOrLong(), HEX);// 0 16bit_uuid, 1 128bit_uuid
+  sprint("Chars UUID: ");
   if(chars->getUUID().shortOrLong() == UUID::UUID_TYPE_SHORT) {//すでに決まっているUUIDを列挙
-    Serial.println(chars->getUUID().getShortUUID(), HEX);
+    sprintln(chars->getUUID().getShortUUID(), HEX);
   }
   else {//作ったUUIDを列挙
     uint8_t index;
     const uint8_t *uuid = chars->getUUID().getBaseUUID();
     for(index=0; index<16; index++) {
-      Serial.print(uuid[index], HEX);
-      Serial.print(" ");
+      sprint(uuid[index], HEX);
+      sprint(" ");
     }
-    Serial.println(" ");
+    sprintln(" ");
   }
-  Serial.print("properties_read: ");
-  Serial.println(chars->getProperties().read(), DEC);
-  Serial.print("properties_writeWoResp : ");
-  Serial.println(chars->getProperties().writeWoResp(), DEC);
-  Serial.print("properties_write: ");
-  Serial.println(chars->getProperties().write(), DEC);
-  Serial.print("properties_notify: ");
-  Serial.println(chars->getProperties().notify(), DEC);
-  Serial.print("declHandle: ");
-  Serial.println(chars->getDeclHandle(), HEX);
-  Serial.print("valueHandle: ");
-  Serial.println(chars->getValueHandle(), HEX);
-  Serial.print("lastHandle: ");
-  Serial.println(chars->getLastHandle(), HEX);
-  Serial.print("getConnectionHandle: ");
-  Serial.println(chars->getConnectionHandle(), HEX);
-  Serial.println("");
+  sprint("properties_read: ");
+  sprintln(chars->getProperties().read(), DEC);
+  sprint("properties_writeWoResp : ");
+  sprintln(chars->getProperties().writeWoResp(), DEC);
+  sprint("properties_write: ");
+  sprintln(chars->getProperties().write(), DEC);
+  sprint("properties_notify: ");
+  sprintln(chars->getProperties().notify(), DEC);
+  sprint("declHandle: ");
+  sprintln(chars->getDeclHandle(), HEX);
+  sprint("valueHandle: ");
+  sprintln(chars->getValueHandle(), HEX);
+  sprint("lastHandle: ");
+  sprintln(chars->getLastHandle(), HEX);
+  sprint("getConnectionHandle: ");
+  sprintln(chars->getConnectionHandle(), HEX);
+  sprintln("");
 
 /*  //notifyが許可されているか
   if(chars->getProperties().notify() == 0x01){
@@ -132,7 +142,7 @@ static void discoveredCharacteristicCallBack(const DiscoveredCharacteristic *cha
  * Peripheralに何かしてほしいときはこの関数をコールバックする。
  */
 void onDataWriteCallBack(const GattWriteCallbackParams *params) {
-  Serial.println("GattClient write call back ");
+  sprintln("GattClient write call back ");
   ble.disconnect((Gap::DisconnectionReason_t)0);
 }
 
@@ -142,19 +152,19 @@ void onDataWriteCallBack(const GattWriteCallbackParams *params) {
  *notifyと比較して、静的なデータのみを読み込む
  */
 void onDataReadCallBack(const GattReadCallbackParams *params) {
-  Serial.println("*****GattClient read call back ");
-  Serial.print("The handle : ");
-  Serial.println(params->handle, HEX);
-  Serial.print("The offset : ");
-  Serial.println(params->offset, DEC);
-  Serial.print("The len : ");
-  Serial.println(params->len, DEC);
-  Serial.print("The data : ");
+  sprintln("*****GattClient read call back ");
+  sprint("The handle : ");
+  sprintln(params->handle, HEX);
+  sprint("The offset : ");
+  sprintln(params->offset, DEC);
+  sprint("The len : ");
+  sprintln(params->len, DEC);
+  sprint("The data : ");
   for (uint8_t index=0; index<params->len; index++) {
-    Serial.print(params->data[index]); //これでデータを取得する
-    Serial.print(" ");
+    sprint(params->data[index]); //これでデータを取得する
+    sprint(" ");
   }
-  Serial.println("");
+  sprintln("");
 
   if (params->data[0] ==0) {
     uint8_t value = CHECK_POINT_ID;
@@ -167,7 +177,7 @@ void onDataReadCallBack(const GattReadCallbackParams *params) {
 void setup() {
   // put your setup code here, to run once:
   Serial.begin(9600);
-  Serial.println("BLE Central Demo ");
+  sprintln("BLE Central Demo ");
 
   ble.init();
   ble.setAdvertisingType(GapAdvertisingParams::ADV_CONNECTABLE_UNDIRECTED);
