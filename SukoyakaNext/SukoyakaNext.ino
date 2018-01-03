@@ -1,5 +1,17 @@
-//#include <BLE_API.h>
 #include <nRF5x_BLE_API.h>
+
+#define DEBUG
+
+#ifdef DEBUG
+#define sprintln Serial.println
+#define sprint Serial.print
+#define swrite Serial.write
+#else
+#define sprintln(fmt, ...) ;
+#define sprint(fmt, ...) ;
+#define swrite(fmt, ...) ;
+#endif
+
 #define TXRX_BUF_LEN 20
 #define DEVICE_NAME       "Sukoyaka Next"
 
@@ -7,77 +19,102 @@ BLE ble;
 
 //Timer
 Ticker ticker1s;
+Ticker tickerLed;
+int led_cnt;
+int led_num = 1;
 
 //データの格納する配列
-static uint8_t tx_buf[TXRX_BUF_LEN];
+//static uint8_t tx_buf[TXRX_BUF_LEN];
 
 // The Nordic UART Service
 static const uint8_t service1_uuid[]        = {0x71, 0x3D, 0, 0, 0x50, 0x3E, 0x4C, 0x75, 0xBA, 0x94, 0x31, 0x48, 0xF1, 0x8D, 0x94, 0x1E};
 static const uint8_t service1_chars1_uuid[] = {0x71, 0x3D, 0, 2, 0x50, 0x3E, 0x4C, 0x75, 0xBA, 0x94, 0x31, 0x48, 0xF1, 0x8D, 0x94, 0x1E};
-static const uint8_t service1_chars2_uuid[] = {0x71, 0x3D, 0, 3, 0x50, 0x3E, 0x4C, 0x75, 0xBA, 0x94, 0x31, 0x48, 0xF1, 0x8D, 0x94, 0x1E};
-static const uint8_t service1_chars3_uuid[] = {0x71, 0x3D, 0, 4, 0x50, 0x3E, 0x4C, 0x75, 0xBA, 0x94, 0x31, 0x48, 0xF1, 0x8D, 0x94, 0x1E};
+//static const uint8_t service1_chars2_uuid[] = {0x71, 0x3D, 0, 3, 0x50, 0x3E, 0x4C, 0x75, 0xBA, 0x94, 0x31, 0x48, 0xF1, 0x8D, 0x94, 0x1E};
+//static const uint8_t service1_chars3_uuid[] = {0x71, 0x3D, 0, 4, 0x50, 0x3E, 0x4C, 0x75, 0xBA, 0x94, 0x31, 0x48, 0xF1, 0x8D, 0x94, 0x1E};
 static const uint8_t uart_base_uuid_rev[]   = {0x1E, 0x94, 0x8D, 0xF1, 0x48, 0x31, 0x94, 0xBA, 0x75, 0x4C, 0x3E, 0x50, 0, 0, 0x3D, 0x71};
  
 uint8_t chars1_value[TXRX_BUF_LEN] = {0,};
-uint8_t chars2_value[TXRX_BUF_LEN] = {0,};
-uint8_t chars3_value[TXRX_BUF_LEN] = {0x01, 0x02, 0x03};
+//uint8_t chars2_value[TXRX_BUF_LEN] = {0,};
+//uint8_t chars3_value[TXRX_BUF_LEN] = {0x01, 0x02, 0x03};
 
 GattCharacteristic characteristic1(service1_chars1_uuid, chars1_value, 1, TXRX_BUF_LEN, GattCharacteristic::BLE_GATT_CHAR_PROPERTIES_READ | GattCharacteristic::BLE_GATT_CHAR_PROPERTIES_WRITE | GattCharacteristic::BLE_GATT_CHAR_PROPERTIES_WRITE_WITHOUT_RESPONSE );
-GattCharacteristic characteristic2(service1_chars2_uuid, chars2_value, 1, TXRX_BUF_LEN, GattCharacteristic::BLE_GATT_CHAR_PROPERTIES_READ);
+//GattCharacteristic characteristic2(service1_chars2_uuid, chars2_value, 1, TXRX_BUF_LEN, GattCharacteristic::BLE_GATT_CHAR_PROPERTIES_READ);
 //通知
-GattCharacteristic characteristic3(service1_chars3_uuid, chars3_value, 1, TXRX_BUF_LEN, GattCharacteristic::BLE_GATT_CHAR_PROPERTIES_NOTIFY);
-GattCharacteristic *uartChars[] = {&characteristic1, &characteristic2, &characteristic3};
+//GattCharacteristic characteristic3(service1_chars3_uuid, chars3_value, 1, TXRX_BUF_LEN, GattCharacteristic::BLE_GATT_CHAR_PROPERTIES_NOTIFY);
+GattCharacteristic *uartChars[] = {&characteristic1, /*&characteristic2, &characteristic3*/};
 GattService uartService(service1_uuid, uartChars, sizeof(uartChars) / sizeof(GattCharacteristic *));
 
 //接続がされたときの処理
 void connectionCallBack( const Gap::ConnectionCallbackParams_t *params ) {
-  Serial.println("Conect");
+  sprintln("Conect");
   if(params->role == Gap::PERIPHERAL) {
-    Serial.println("Peripheral ");
+    sprintln("Peripheral ");
   }
 }
 
 //切断
 void disconnectionCallBack(const Gap::DisconnectionCallbackParams_t *params) {
-  Serial.print("Disconnected hande : ");
-  Serial.println(params->handle);
-  Serial.print("Disconnected reason : ");
-  Serial.println(params->reason);
-  Serial.println("Restart advertising ");
+  sprint("Disconnected hande : ");
+  sprintln(params->handle);
+  sprint("Disconnected reason : ");
+  sprintln(params->reason);
+  sprintln("Restart advertising ");
   ble.startAdvertising();
 }
 
 //データの読み込み
 void writtenHandle(const GattWriteCallbackParams *Handler) {
   digitalWrite(13, LOW);
-  Serial.println("writtenHandle");
+  sprint("writtenHandle\t");
+  sprint(Handler->handle, HEX);
+  sprint("\t");
+  sprintln(characteristic1.getValueAttribute().getHandle(), HEX);
   uint8_t buf[TXRX_BUF_LEN];
-  uint16_t bytesRead, index;
+  uint16_t bytesRead = TXRX_BUF_LEN;
+  uint16_t index;
 
   if (Handler->handle == characteristic1.getValueAttribute().getHandle()) {
     ble.readCharacteristicValue(characteristic1.getValueAttribute().getHandle(), buf, &bytesRead);
+    sprintln(bytesRead);
     for(byte index=0; index<bytesRead; index++) {
-      Serial.write(buf[index]);
+      sprint(buf[index], HEX);
+      sprint(" ");
     }
+    sprintln("");
+    led_num = bytesRead;
   }
   digitalWrite(13, HIGH);
 }
-
+/*
 void task_handle(void) {
   tx_buf[0] += 2;
   tx_buf[1] += 2;
   tx_buf[2] += 2;
 
   //BLEデータ送信
-/*  Serial.print(tx_buf[0]); Serial.print("\t");
+  Serial.print(tx_buf[0]); Serial.print("\t");
   Serial.print(tx_buf[1]); Serial.print("\t");
   Serial.println(tx_buf[2]);
-*/
+
   //静的なデータを送信
   ble.updateCharacteristicValue(characteristic2.getValueAttribute().getHandle(), tx_buf, 3);
   
   //動的なデータを送信
   ble.updateCharacteristicValue(characteristic3.getValueAttribute().getHandle(), tx_buf, 3);
+}*/
+
+void task_handle_led(void) {
+  ++led_cnt;
+  if (led_cnt > led_num * 2 + 3) {
+    led_cnt = 0;
+  }
+  if (led_cnt & 0x1 && led_cnt < led_num * 2) {
+//    sprintln("task_handle_led " + led_cnt + "ON");
+    digitalWrite(13, HIGH);
+  } else {
+//    sprintln("task_handle_led " + led_cnt + "OFF");
+    digitalWrite(13, LOW);
+  }
 }
 
 
@@ -86,7 +123,8 @@ void setup() {
   Serial.begin(9600);
 
    // タイマー
-  ticker1s.attach(task_handle, 1);
+//  ticker1s.attach(task_handle, 1);
+  tickerLed.attach_us(task_handle_led, 200000);
 
   //BLE設定
   ble.init();
@@ -115,16 +153,16 @@ void setup() {
   // start advertising
   ble.startAdvertising();
 
-  Serial.println("Advertising Start!"); 
-
+  sprintln("Advertising Start!"); 
+/*
   //initiaze scope
   tx_buf[0] = 50;
   tx_buf[1] = 10;
   tx_buf[2] = 20;
-  Serial.print(tx_buf[0]); Serial.print("\t");
-  Serial.print(tx_buf[1]); Serial.print("\t");
-  Serial.println(tx_buf[2]);
-  digitalWrite(13, HIGH);
+  sprint(tx_buf[0]); sprint("\t");
+  sprint(tx_buf[1]); sprint("\t");
+  sprintln(tx_buf[2]);
+  digitalWrite(13, HIGH);*/
 }
 
 void loop() {   
