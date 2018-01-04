@@ -10,27 +10,26 @@
 #define sprint(fmt, ...) ;
 #endif
 
-BLE           ble;
 static uint8_t CHECK_POINT_ID = 0x11;
-//ServerのUUID
+
+BLE ble;
+
+// アクセスしたいサービスのUUID
 static uint8_t service1_uuid[]    = {0x71, 0x3D, 0, 0, 0x50, 0x3E, 0x4C, 0x75, 0xBA, 0x94, 0x31, 0x48, 0xF1, 0x8D, 0x94, 0x1E};
 UUID service_uuid(service1_uuid);
 
 
-// To save the hrm characteristic and descriptor
-static DiscoveredCharacteristic            Characteristic_values;
+// スキャンで見つかったキャラクタリスティックを保存
+static DiscoveredCharacteristic Characteristic_values;
 
-//関数
+// コールバック関数
 static void scanCallBack(const Gap::AdvertisementCallbackParams_t *params);
 static void discoveredCharacteristicCallBack(const DiscoveredCharacteristic *chars);
+static void onDataWriteCallBack(const GattWriteCallbackParams *params);
+static void onDataReadCallBack(const GattReadCallbackParams *params);
 
-static void onDataWriteCallBack(const GattWriteCallbackParams *params); //送信のときに呼ぶ
-static void onDataReadCallBack(const GattReadCallbackParams *params); //静的なデータを取得するときに呼ぶ
 
-
-/**
- * 接続判定をする関数
- */
+//アドバタイジングのデータを解析してデバイス名を返す
 uint32_t ble_advdata_parser(uint8_t type, uint8_t advdata_len, uint8_t *p_advdata, uint8_t *len, uint8_t *p_field_data) {
   uint8_t index=0;
   uint8_t field_length, field_type;
@@ -38,6 +37,15 @@ uint32_t ble_advdata_parser(uint8_t type, uint8_t advdata_len, uint8_t *p_advdat
   while(index<advdata_len) {
     field_length = p_advdata[index];
     field_type   = p_advdata[index+1];
+    sprint("field_type : ");
+    sprint(field_type, HEX);
+    sprint("   type : ");
+    sprint(type, HEX);
+    uint8_t adv_name[31];
+    memset(adv_name, '\0', 31);
+    memcpy(adv_name, &p_advdata[index+2], (field_length-1));
+    sprint("  name : ");
+    sprintln((const char*)adv_name);
     if(field_type == type) {
       memcpy(p_field_data, &p_advdata[index+2], (field_length-1));
       *len = field_length - 1;
@@ -49,66 +57,59 @@ uint32_t ble_advdata_parser(uint8_t type, uint8_t advdata_len, uint8_t *p_advdat
 }
 
 
-/**
- * スキャンの後、ショートネームが一致したら接続
- */
+// スキャンのコールバック処理
+// ショートネームが一致したら接続
 static void scanCallBack(const Gap::AdvertisementCallbackParams_t *params) {
+  sprintln("* scan call back");
   uint8_t len;
-  uint8_t adv_name[31];
+  uint8_t adv_name[31];   // アドバタイジングパケットの最大は31バイトっぽいので、ショートネーム以外でもこのままでいい
+          //  BLE_GAP_AD_TYPE_COMPLETE_LOCAL_NAME
   if( NRF_SUCCESS == ble_advdata_parser(BLE_GAP_AD_TYPE_SHORT_LOCAL_NAME, params->advertisingDataLen, (uint8_t *)params->advertisingData, &len, adv_name) ) {
-    sprint("Short name len : ");
+    sprint("Device name len : ");
     sprintln(len, DEC);
-    sprint("Short name is : ");
+    sprint("Device name is : ");
     sprintln((const char*)adv_name);
 
-    if( memcmp("TXRX", adv_name, 4) == 0x00 ) {//取得したいショートネームを書く
-      sprintln("Got device, stop scan ");
+    if( memcmp("TXRX", adv_name, 4) == 0x00 ) {  //取得したいショートネームを書く
+      sprintln("got device, stop scan, connecting");
       ble.stopScan();
       ble.connect(params->peerAddr, BLEProtocol::AddressType::RANDOM_STATIC, NULL, NULL);
     }
   }
 }
 
-/** 
- * 接続した後、振る舞い(write, read etc..)の情報を取得
- * discoveredCharacteristicCallBack関数で表示をする
- */
+// 接続のコールバック処理
 void connectionCallBack( const Gap::ConnectionCallbackParams_t *params ) {
-  sprintln("\r\n----startDiscovery");
-  //オプションつけると自作したサービスのみが呼ばれるようになる
+  sprintln("* connection call back");
   ble.gattClient().launchServiceDiscovery(params->handle, NULL, discoveredCharacteristicCallBack, service_uuid);
-  digitalWrite(13, LOW);
+  digitalWrite(13, LOW);       // LED OFF
 }
 
 
-/*
- * 切断のときに呼ばれる
- */
+// 切断のコールバック処理
 void disconnectionCallBack(const Gap::DisconnectionCallbackParams_t *params) {
-  sprintln("Disconnected, start to scanning");
+  sprintln("* disconnect call back");
   ble.startScan(scanCallBack);
-  digitalWrite(13, HIGH);
+  digitalWrite(13, HIGH);      // LED ON
 }
 
-/**
- * 接続されたBLEのRSSIやUUIDを表示する
- */
+// 接続後のサービス列挙のコールバック処理
+// 接続されたBLEのRSSIやUUIDを表示する
 static void discoveredCharacteristicCallBack(const DiscoveredCharacteristic *chars) {
-  //Info
+  sprintln("* servie enum call back");
   sprint("Chars UUID type:");
-  sprintln(chars->getUUID().shortOrLong(), HEX);// 0 16bit_uuid, 1 128bit_uuid
+  sprintln(chars->getUUID().shortOrLong(), HEX);                // 0 16bit_uuid, 1 128bit_uuid
   sprint("Chars UUID: ");
-  if(chars->getUUID().shortOrLong() == UUID::UUID_TYPE_SHORT) {//すでに決まっているUUIDを列挙
+  if(chars->getUUID().shortOrLong() == UUID::UUID_TYPE_SHORT) { //すでに決まっているUUIDを列挙
     sprintln(chars->getUUID().getShortUUID(), HEX);
-  }
-  else {//作ったUUIDを列挙
+  } else {                                                      //作ったUUIDを列挙
     uint8_t index;
     const uint8_t *uuid = chars->getUUID().getBaseUUID();
     for(index=0; index<16; index++) {
       sprint(uuid[index], HEX);
       sprint(" ");
     }
-    sprintln(" ");
+    sprintln("");
   }
   sprint("properties_read: ");
   sprintln(chars->getProperties().read(), DEC);
@@ -128,33 +129,21 @@ static void discoveredCharacteristicCallBack(const DiscoveredCharacteristic *cha
   sprintln(chars->getConnectionHandle(), HEX);
   sprintln("");
 
-/*  //notifyが許可されているか
-  if(chars->getProperties().notify() == 0x01){
-    Serial.println("found notify");
-    Characteristic_values = *chars;
-  }*/
-  if (chars->getValueHandle() == 0x0E){
-    Characteristic_values = *chars;
+  if (chars->getValueHandle() == 0x0E){    // 指定のハンドルなら
+    Characteristic_values = *chars;        // 値を受信する
     ble.gattClient().read(chars->getConnectionHandle(), chars->getValueHandle(), 0);
   }
 }
 
-/**
- * データをPeripheralへ送信
- * Peripheralに何かしてほしいときはこの関数をコールバックする。
- */
+// 書き込みのコールバック処理
 void onDataWriteCallBack(const GattWriteCallbackParams *params) {
-  sprintln("GattClient write call back ");
+  sprintln("* write call back");
   ble.disconnect((Gap::DisconnectionReason_t)0);
 }
 
-/** @brief  read callback handle
- *データの読み込み
- *Peripheralからのデータを読み込み
- *notifyと比較して、静的なデータのみを読み込む
- */
+// 読み込みのコールバック処理
 void onDataReadCallBack(const GattReadCallbackParams *params) {
-  sprintln("*****GattClient read call back ");
+  sprintln("* read call back");
   sprint("The handle : ");
   sprintln(params->handle, HEX);
   sprint("The offset : ");
@@ -162,40 +151,39 @@ void onDataReadCallBack(const GattReadCallbackParams *params) {
   sprint("The len : ");
   sprintln(params->len, DEC);
   sprint("The data : ");
-  for (uint8_t index=0; index<params->len; index++) {
-    sprint(params->data[index]); //これでデータを取得する
+  for (uint8_t index = 0; index<params->len; index++) {
+    sprint(params->data[index]);
     sprint(" ");
   }
   sprintln("");
 
-  if (params->data[0] ==0) {
+  if (params->data[0] ==0) {                         // 何も書かれていないときは、チェックポイントIDを書き込む
     uint8_t value = CHECK_POINT_ID;
     ble.gattClient().write(GattClient::GATT_OP_WRITE_REQ, Characteristic_values.getConnectionHandle(), params->handle, 1, (uint8_t *)&value);
   } else {
-    ble.disconnect((Gap::DisconnectionReason_t)0);
+    ble.disconnect((Gap::DisconnectionReason_t)0);   // 既に書き込まれていたら何もしない
   }
 }
 
+// 初期処理
 void setup() {
   pinMode(13, OUTPUT);
-  // put your setup code here, to run once:
   Serial.begin(9600);
-  sprintln("BLE Central Demo ");
+  sprintln("* setup");
 
   ble.init();
   ble.setAdvertisingType(GapAdvertisingParams::ADV_CONNECTABLE_UNDIRECTED);
   ble.onConnection(connectionCallBack);
-  ble.onDisconnection(disconnectionCallBack); //切断されたときの処理
-  ble.gattClient().onDataWrite(onDataWriteCallBack); //書き込み send
-  ble.gattClient().onDataRead(onDataReadCallBack); //読み込み read
-  ble.setScanParams(1000, 200, 0, true); //スキャニング時間 ウィンドウ時間? タイムアウト アクティブにするか
-  // start scanning
-  ble.startScan(scanCallBack); //スキャニングのスタート
-  digitalWrite(13, HIGH);
+  ble.onDisconnection(disconnectionCallBack);        // 切断されたときの処理
+  ble.gattClient().onDataWrite(onDataWriteCallBack); // 書き込み send
+  ble.gattClient().onDataRead(onDataReadCallBack);   // 読み込み read
+  ble.setScanParams(1000, 200, 0, true);             // スキャニング時間 ウィンドウ時間? タイムアウト アクティブにするか
+  ble.startScan(scanCallBack);                       // スキャニングのスタート
+  digitalWrite(13, HIGH);                            // LED ON
 }
 
+// メイン
 void loop() {
-  // put your main code here, to run repeatedly:
   ble.waitForEvent();
 }
 
