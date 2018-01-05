@@ -14,13 +14,6 @@ static uint8_t CHECK_POINT_ID = 0x11;
 
 BLE ble;
 
-// アクセスしたいサービスのUUID
-//static uint8_t service1_uuid[]    = {0x71, 0x3D, 0, 0, 0x50, 0x3E, 0x4C, 0x75, 0xBA, 0x94, 0x31, 0x48, 0xF1, 0x8D, 0x94, 0x1E};
-//static uint8_t service1_uuid[]    = {0x2A, 0x0};
-static uint8_t service1_uuid[]    = {0, 0x2A};
-UUID service_uuid(service1_uuid);
-
-
 // スキャンで見つかったキャラクタリスティックを保存
 static DiscoveredCharacteristic Characteristic_values;
 
@@ -66,16 +59,13 @@ static void scanCallBack(const Gap::AdvertisementCallbackParams_t *params) {
   uint8_t len;
   uint8_t adv_name[31];   // アドバタイジングパケットの最大は31バイトっぽいので、ショートネーム以外でもこのままでいい
   memset(adv_name, '\0', sizeof adv_name);
-          //  BLE_GAP_AD_TYPE_COMPLETE_LOCAL_NAME
-//  if( NRF_SUCCESS == ble_advdata_parser(BLE_GAP_AD_TYPE_COMPLETE_LOCAL_NAME, params->advertisingDataLen, (uint8_t *)params->advertisingData, &len, adv_name) ) {
   if( NRF_SUCCESS == ble_advdata_parser(BLE_GAP_AD_TYPE_COMPLETE_LOCAL_NAME, params->advertisingDataLen, (uint8_t *)params->advertisingData, &len, adv_name) ) {
     sprint("Device name len : ");
     sprintln(len, DEC);
     sprint("Device name is : ");
     sprintln((const char*)adv_name);
 
-//    if( memcmp("TXRX", adv_name, 4) == 0x00 ) {  //取得したいショートネームを書く
-    if( memcmp("nut", adv_name, 3) == 0x00 ) {  //取得したいショートネームを書く
+    if( memcmp("nut", adv_name, 3) == 0x00 ) {          // 「nut」を選択
       sprintln("got device, stop scan, connecting");
       ble.stopScan();
       ble.connect(params->peerAddr, BLEProtocol::AddressType::RANDOM_STATIC, NULL, NULL);
@@ -86,7 +76,6 @@ static void scanCallBack(const Gap::AdvertisementCallbackParams_t *params) {
 // 接続のコールバック処理
 void connectionCallBack( const Gap::ConnectionCallbackParams_t *params ) {
   sprintln("* connection call back");
-//  ble.gattClient().launchServiceDiscovery(params->handle, NULL, discoveredCharacteristicCallBack, service_uuid);
   ble.gattClient().launchServiceDiscovery(params->handle, NULL, discoveredCharacteristicCallBack);
   digitalWrite(13, LOW);       // LED OFF
 }
@@ -135,9 +124,9 @@ static void discoveredCharacteristicCallBack(const DiscoveredCharacteristic *cha
   sprintln(chars->getConnectionHandle(), HEX);
   sprintln("");
 
-//  if (chars->getValueHandle() == 0x0E){    // 指定のハンドルなら
-// 2A00 or "A06
-  if (chars->getUUID().getShortUUID() == 0x2A06 && chars->getProperties().read() != 9 && chars->getProperties().write() != 0){    // 指定のハンドルなら
+  // 読み書き可能なキャラクタリスティックかつ既定のハンドルのみ処理をする
+  // nutは"2A00"(不明) or "2A06"(AlertLevel)が読み書き可能
+  if (chars->getUUID().getShortUUID() == 0x2A06 && chars->getProperties().read() != 0 && chars->getProperties().write() != 0){
     sprintln("READ!!");
     Characteristic_values = *chars;        // 値を受信する
     ble.gattClient().read(chars->getConnectionHandle(), chars->getValueHandle(), 0);
@@ -166,14 +155,12 @@ void onDataReadCallBack(const GattReadCallbackParams *params) {
   }
   sprintln("");
 
-//  if (params->data[0] == 0) {                         // 何も書かれていないときは、チェックポイントIDを書き込む
-//    uint8_t value = CHECK_POINT_ID;
-/*  if (params->data[0] != 0) {                         // 何も書かれていないときは、チェックポイントIDを書き込む
-    uint8_t value = 0;
+  if (params->data[0] == 0) {                         // 何も書かれていないときは、チェックポイントIDを書き込む
+    uint8_t value = CHECK_POINT_ID;
     ble.gattClient().write(GattClient::GATT_OP_WRITE_REQ, Characteristic_values.getConnectionHandle(), params->handle, 1, (uint8_t *)&value);
   } else {
     ble.disconnect((Gap::DisconnectionReason_t)0);   // 既に書き込まれていたら何もしない
-  }*/
+  }
 }
 
 // 初期処理
@@ -188,7 +175,7 @@ void setup() {
   ble.onDisconnection(disconnectionCallBack);        // 切断されたときの処理
   ble.gattClient().onDataWrite(onDataWriteCallBack); // 書き込み send
   ble.gattClient().onDataRead(onDataReadCallBack);   // 読み込み read
-  ble.setScanParams(1000, 200, 0, true);             // スキャニング時間 ウィンドウ時間? タイムアウト アクティブにするか
+  ble.setScanParams(5000, 200, 0, true);             // スキャニング時間 ウィンドウ時間? タイムアウト アクティブにするか
   ble.startScan(scanCallBack);                       // スキャニングのスタート
   digitalWrite(13, HIGH);                            // LED ON
 }
